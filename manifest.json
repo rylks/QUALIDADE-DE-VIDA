@@ -1,15 +1,67 @@
 {
   "manifest_version": 3,
   "name": "JARVIS",
-  "version": "0.1",
-  "icons": { "16": "icon.png", "32": "icon.png", "48": "icon.png", "128": "icon.png" },
-  "description": "SIMULA QUE VOCE ESTA NAS LIVES E MUDA A PAGINA ATÉ DIGITAR $JOGAR DEPOIS VOLTA PRA SUA PAGINA!",
-  "permissions": ["storage", "alarms", "debugger"],
-  "host_permissions": ["https://4o9ys9ib13.execute-api.us-east-1.amazonaws.com/*"],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [
-    { "matches": ["https://www.twitch.tv/*"], "js": ["content.js"], "run_at": "document_idle" },
-    { "matches": ["https://riftstream.com.br/*", "https://www.riftstream.com.br/*"], "js": ["char.js"], "run_at": "document_idle" }
+  "version": "0.9.6",
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "description": "Jarvis 0.9.6: ranking do personagem mais resiliente e reutilização da aba Rift existente sem duplicatas; mantém recursos anteriores.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "debugger",
+    "tabs",
+    "identity"
   ],
-  "action": { "default_popup": "popup.html", "default_title": "PREGUIÇA", "default_icon": "icon.png" }
+  "host_permissions": [
+    "https://z6ywq6r3ub.execute-api.us-east-1.amazonaws.com/*",
+    "https://riftstream.com.br/*",
+    "https://www.riftstream.com.br/*",
+    "https://api.twitch.tv/*",
+    "https://id.twitch.tv/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://riftstream.com.br/character*",
+        "https://www.riftstream.com.br/character*"
+      ],
+      "js": [
+        "me-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://riftstream.com.br/*",
+        "https://www.riftstream.com.br/*"
+      ],
+      "js": [
+        "char.js",
+        "forge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PREGUIÇA",
+    "default_icon": "icon.png"
+  }
 }

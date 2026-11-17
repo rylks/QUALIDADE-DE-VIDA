@@ -1,26 +1,614 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <style>
-  body{width:320px;margin:0;padding:12px;font:13px system-ui,sans-serif;background:#0d0b19;color:#eee}
-  label{display:flex;justify-content:space-between;align-items:center;margin:6px 0;gap:8px}
-  textarea{width:100%;box-sizing:border-box;height:90px;padding:6px;background:#1b1830;color:#fff;border:1px solid #444;border-radius:4px;font:12px monospace;resize:vertical}
-  input[type=number]{width:70px;padding:3px;background:#1b1830;color:#fff;border:1px solid #444;border-radius:4px}
-  .chk{justify-content:flex-start}
-  button{width:100%;padding:8px;margin-top:8px;border:0;border-radius:6px;font-weight:700;cursor:pointer;background:#f5c400;color:#111}
-  button.on{background:#2ecc71}
-  button.sec{background:#2a2650;color:#eee}
-  #status{margin-top:8px;font-size:12px;color:#ccc;min-height:30px}
-  #summary{margin-top:4px;font-size:11px;color:#888;word-break:break-word}
-  small{color:#888}
+  :root{
+    --bg:#0b0917; --text:#f4f1ff; --muted:#bcb7d8; --line:rgba(150,135,235,.30);
+    --gold:#f5c400; --ok:#34d57a; --warn:#f5a524; --err:#ff6b6b;
+    --pa:.50;   /* opacidade dos painéis */
+    --va:.31;   /* véu sobre o card do personagem */
+    --ba:.48;   /* véu sobre o fundo geral */
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{position:relative;isolation:isolate;width:560px;margin:0;padding:14px;font:13px/1.4 system-ui,"Segoe UI",sans-serif;color:var(--text);text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  /* fundo geral do popup: use popup-bg.gif/png/jpg/webp para trocar. Sem arquivo, usa popup-bg-default.png. O card do personagem continua usando bg.gif/png/jpg/webp. */
+  body::before{content:"";position:fixed;inset:0;z-index:-2;background:url(popup-bg.gif) center/cover no-repeat,url(popup-bg.png) center/cover no-repeat,url(popup-bg.jpg) center/cover no-repeat,url(popup-bg.webp) center/cover no-repeat,url(popup-bg-default.png) center/cover no-repeat,var(--bg)}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(11,9,23,calc(var(--ba) + .12)),rgba(11,9,23,var(--ba)) 40%,rgba(11,9,23,calc(var(--ba) + .12)))}
+  ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:rgba(150,135,235,.35);border-radius:999px}
+
+  .glass{background:rgba(16,13,34,var(--pa));border:1px solid var(--line);border-radius:18px;backdrop-filter:blur(8px) saturate(1.2);box-shadow:0 6px 22px rgba(0,0,0,.28)}
+
+  header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .logo{width:40px;height:40px;border-radius:14px;border:1px solid rgba(245,196,0,.55);object-fit:cover;box-shadow:0 0 14px rgba(245,196,0,.25)}
+  .title{flex:1;min-width:0}
+  .title strong{display:block;font-size:16px;letter-spacing:.4px}
+  .title span{font-size:12px;color:var(--muted)}
+
+  .switch{position:relative;width:46px;height:25px;flex:none;cursor:pointer}
+  .switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+  .track{position:absolute;inset:0;border-radius:13px;background:rgba(42,38,80,.85);border:1px solid var(--line);transition:background .15s}
+  .track::after{content:"";position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#d8d4ee;transition:transform .15s,background .15s}
+  .switch input:checked + .track{background:var(--ok)}
+  .switch input:checked + .track::after{transform:translateX(21px);background:#0b0917}
+  .switch input:focus-visible + .track{outline:2px solid var(--gold);outline-offset:2px}
+
+  .top{display:flex;gap:10px;align-items:stretch}
+  .status{flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;border-left:4px solid var(--muted)}
+  .status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .status.ok{border-left-color:var(--ok)} .status.ok::before{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .status.busy{border-left-color:var(--gold)} .status.busy::before{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+  .status.err{border-left-color:var(--err)} .status.err::before{background:var(--err);box-shadow:0 0 8px var(--err)}
+  #status{margin:0}
+  .meta{display:flex;max-width:190px;flex-direction:column;justify-content:center;align-items:flex-end;gap:2px;font-size:12px;color:var(--muted);white-space:nowrap}
+  .meta span:empty{display:none}
+
+  /* seções recolhíveis */
+  details.sec{margin-top:14px}
+  details.sec > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);padding:2px 0 7px}
+  details.sec > summary::-webkit-details-marker{display:none}
+  details.sec > summary::before{content:"▸";font-size:10px;transition:transform .12s}
+  details.sec[open] > summary::before{transform:rotate(90deg)}
+  details.sec > summary::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  details.sec > summary:hover{color:var(--text)}
+  details.sec > summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+  summary .count{font-weight:500;letter-spacing:0;text-transform:none}
+
+  /* personagem: o fundo aparece quase sem véu; só os números ganham caixas translúcidas */
+  .hero{
+    position:relative;isolation:isolate;display:flex;gap:12px;padding:12px;border:1px solid rgba(245,196,0,.32);border-radius:22px;overflow:hidden;
+    background:radial-gradient(circle at 20% 30%,#3b2a8a 0,transparent 45%),radial-gradient(circle at 80% 70%,#7a2a6b 0,transparent 45%),#120f26;
+    box-shadow:0 6px 24px rgba(0,0,0,.35)
+  }
+  .hero::before{content:"";position:absolute;inset:0;z-index:-2;
+    background:url(bg.gif) center/cover no-repeat,url(bg.png) center/cover no-repeat,url(bg.jpg) center/cover no-repeat,url(bg.webp) center/cover no-repeat}
+  .hero::after{content:"";position:absolute;inset:0;z-index:-1;
+    background:linear-gradient(90deg,rgba(11,9,23,calc(var(--va) + .22)) 0%,rgba(11,9,23,var(--va)) 55%,rgba(11,9,23,calc(var(--va) * .3)) 100%)}
+  .hero-main{flex:1;min-width:0}
+  .hero-art{flex:none;width:124px;display:flex;align-items:flex-end;justify-content:center}
+  .hero-art img{max-width:100%;max-height:210px;image-rendering:pixelated;filter:drop-shadow(0 4px 10px rgba(0,0,0,.65))}
+  .hero-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .hero-head strong{font-size:19px;letter-spacing:.3px}
+  .hero-head .sub{font-size:12px;color:#e2deff}
+  .hero-head .in{margin-left:auto;font-size:12px;color:var(--ok);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+  .hero.has-art .grid{grid-template-columns:repeat(4,1fr)}
+  .cell{--c:rgba(150,135,235,.6);padding:5px 6px 6px 8px;min-width:0;background:rgba(11,9,23,calc(var(--pa) * .75));border:1px solid rgba(150,135,235,.28);border-left:3px solid var(--c);border-radius:14px;backdrop-filter:blur(3px)}
+  .cell small{display:block;font-size:10.5px;color:#d3cfee;letter-spacing:.2px}
+  .cell b{display:block;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .cell b.long{font-size:12px;letter-spacing:-.2px}
+  .cell.hl{--c:var(--gold);border-color:rgba(245,196,0,.65)}
+  .cell.hl b{color:var(--gold)}
+  .cell[data-k="hp"]{--c:#4ade80} .cell[data-k="atk"]{--c:#ff6b6b} .cell[data-k="def"]{--c:#60a5fa}
+  .cell[data-k="spd"]{--c:#22d3ee} .cell[data-k="crit"]{--c:#fb923c} .cell[data-k="critDmg"]{--c:#f472b6}
+  .cell[data-k="fc"]{--c:#a78bfa} .cell[data-k="gold"]{--c:#fbbf24} .cell[data-k="best"]{--c:#fbbf24}
+  .cell[data-k="level"]{--c:#c4b5fd} .cell[data-k="rank"]{--c:#e5e7eb}
+  .xp{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:11px;color:#e2deff}
+  .xp .bar{flex:1;height:8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);overflow:hidden}
+  .xp .bar i{display:block;height:100%;background:linear-gradient(90deg,#f59e0b,var(--gold))}
+  .empty-note{padding:10px 12px;color:var(--muted);font-size:12px}
+
+  /* lives: cartões arredondados em duas colunas */
+  ul{list-style:none;margin:0;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(150,135,235,.07);border:1px solid transparent;transition:background .12s,border-color .12s}
+  li:hover{background:rgba(150,135,235,.16);border-color:var(--line)}
+  li .left{display:flex;align-items:center;gap:8px;min-width:0}
+  .lv-on{margin:0;accent-color:var(--gold);cursor:pointer;flex:none}
+  li.off{opacity:.5}
+  li .name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  li .val{font-size:12px;white-space:nowrap;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.25)}
+  li .val.good{color:var(--ok);font-weight:800}
+  li .val.muted{color:var(--muted)}
+  li .val.bad{color:var(--err)}
+  li.best{background:rgba(245,196,0,.14);border-color:rgba(245,196,0,.55);box-shadow:0 0 14px rgba(245,196,0,.15)}
+  li.empty{grid-column:1/-1;color:var(--muted);justify-content:center;background:transparent}
+  .tag{margin-left:6px;font-size:10px;color:#161100;background:var(--gold);font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
+
+  .cfg{display:flex;flex-direction:column;gap:10px;padding:12px 14px}
+  textarea{width:100%;height:76px;padding:9px 11px;background:rgba(8,6,20,.55);color:#fff;border:1px solid var(--line);border-radius:14px;font:12px ui-monospace,Consolas,monospace;resize:vertical;text-shadow:none}
+  .cfg-row{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;align-items:center}
+  label.row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+  label.row:has(input[type=checkbox]){justify-content:flex-start}
+  input[type=number]{width:70px;padding:5px 9px;background:rgba(8,6,20,.55);color:#fff;border:1px solid var(--line);border-radius:999px;text-align:center;text-shadow:none}
+  input[type=range]{width:120px;accent-color:var(--gold)}
+  textarea:focus-visible,input[type=number]:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+  select{padding:5px 10px;background:rgba(8,6,20,.65);color:#fff;border:1px solid var(--line);border-radius:999px}
+  small{color:var(--muted)}
+  .note{margin:0;font-size:12px;color:#e2deff}
+
+  /* Submenus Lives e Forja recolhidos junto com Configurações. */
+  details.subsec{margin-top:0}
+  details.subsec > summary{padding:6px 0 8px}
+  details.subsec > .cfg-sub{padding:7px 0 3px}
+  details.subsec > ul{margin:3px 0 5px}
+  .cfg-appearance{padding-bottom:7px;border-bottom:1px solid var(--line)}
+  button.mini-btn{width:auto;margin:3px 0 0;padding:7px 14px;font-size:12px;border-radius:999px}
+  .discover-tools{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .monitor-content{padding:3px 0 8px}
+  .monitor-content .top{gap:8px;align-items:stretch}
+  .monitor-content .status{min-width:0;font-size:12px;padding:9px 12px}
+  .monitor-content .meta{max-width:200px;min-width:160px;white-space:normal;align-items:flex-end;text-align:right;font-size:11px}
+  .discover-note{display:block;font-size:11px;margin-top:4px;color:var(--muted)}
+
+  button{width:100%;padding:11px;margin-top:14px;border:0;border-radius:16px;font-weight:800;letter-spacing:.3px;cursor:pointer;background:linear-gradient(180deg,#ffd633,var(--gold));color:#161100;text-shadow:none;box-shadow:0 4px 14px rgba(245,196,0,.25)}
+  button:hover{filter:brightness(1.08)}
+  button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+  button:disabled{opacity:.45;cursor:not-allowed;filter:none;box-shadow:none}
+
+  /* Card compacto, com números legíveis e quase nenhum bloco sobre o GIF.
+     Apenas a apresentação foi alterada; os cliques para ocultar continuam iguais. */
+  .hero{
+    padding:8px 10px 7px;gap:6px;min-height:125px;
+    border-radius:13px;border:1px solid rgba(245,196,0,.24);
+    box-shadow:0 4px 16px rgba(0,0,0,.22)
+  }
+  .hero::before{background-position:center center}
+  .hero::after{
+    background:linear-gradient(90deg,
+      rgba(8,6,20,calc(var(--va) * .76)) 0%,
+      rgba(8,6,20,calc(var(--va) * .39)) 48%,
+      rgba(8,6,20,.02) 84%)
+  }
+  .hero-main{position:relative;z-index:1}
+  .hero-head{gap:6px;margin-bottom:5px;align-items:baseline;flex-wrap:wrap}
+  .hero-head strong{font-size:15px;line-height:1.15}
+  .hero-head .sub{font-size:10px;color:#e9e5ff}
+  .hero-head .in{font-size:9px;color:#6bf4ab;text-shadow:0 1px 3px #000}
+  /* Estado do personagem: faixa discreta, sem caixas cobrindo o GIF. */
+  .char-vitals{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 5px;min-height:15px}
+  .char-life{font-size:10px;font-weight:800;text-shadow:0 1px 3px #000}
+  .char-life.alive{color:#4ade80}.char-life.dead{color:#ff7070}.char-life.unknown{color:#d5cee7}
+  .char-hp-now{font-size:10px;color:#f1efff;font-variant-numeric:tabular-nums}
+  .char-hp-meter{display:inline-flex;width:54px;height:4px;overflow:hidden;border-radius:9px;background:rgba(0,0,0,.4)}
+  .char-hp-meter i{height:100%;display:block;background:#34d57a;border-radius:9px}
+  .hero-art{width:76px;align-items:flex-end}
+  .hero-art img{max-height:129px}
+  .grid,.hero.has-art .grid{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    column-gap:5px;row-gap:3px
+  }
+  .cell,button.cell-toggle{
+    position:relative;min-width:0;min-height:26px;
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+    margin:0;padding:2px 4px 2px 5px;
+    border:0;border-radius:5px;
+    background:rgba(7,6,20,.12);
+    box-shadow:none;backdrop-filter:none;
+    text-align:left;text-transform:none;letter-spacing:0;
+    color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.95);
+    line-height:1.14
+  }
+  .cell small{display:block;max-width:100%;font-size:9px;line-height:1.15;letter-spacing:0;color:#e9e6f8;text-shadow:0 1px 3px #000}
+  .cell b{display:block;max-width:100%;font-size:12px;line-height:1.2;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:#fff}
+  .cell b.long{font-size:10.5px;letter-spacing:-.15px}
+  .cell.hl{background:rgba(8,6,20,.19);box-shadow:inset 2px 0 rgba(245,196,0,.94)}
+  .cell.hl small{color:#fff1b4}
+  .cell.hl b{color:#ffdc39}
+  button.cell-toggle{width:100%;cursor:pointer;filter:none;transition:background-color .12s ease}
+  button.cell-toggle:hover{background:rgba(8,6,20,.48);filter:none}
+  button.cell-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+  .xp{margin-top:5px;display:flex;gap:6px;align-items:center;font-size:9px;color:#f3f0ff}
+  .xp .bar{height:4px;background:rgba(3,2,12,.33);border-color:rgba(255,255,255,.17)}
+  .stat-tools{margin-top:5px}
+  .stat-tools summary{
+    display:inline-flex;align-items:center;gap:4px;list-style:none;
+    margin:0;padding:3px 7px;border:1px solid rgba(230,220,255,.2);
+    background:rgba(8,6,20,.22);border-radius:6px;
+    font-size:10px;color:#eee9ff;cursor:pointer
+  }
+  .stat-tools summary::-webkit-details-marker{display:none}
+  .stat-tools summary::before{content:"⚙";color:var(--gold);font-size:11px}
+  .stat-tools summary:hover{background:rgba(8,6,20,.44)}
+  .stat-tools .stat-options{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px 10px;
+    margin-top:6px;padding:9px;border-radius:9px;background:rgba(9,7,24,.78)
+  }
+  .stat-options label{display:flex;align-items:center;gap:5px;font-size:10.5px;cursor:pointer}
+  .stat-options input{accent-color:var(--gold)}
+  /* Equipamentos minimalistas: ícone 35px e stats detalhados sob clique. */
+  .equipment-block{margin-top:7px;padding:6px 0 1px}
+  .equipment-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+  .equipment-label{font-size:10px;font-weight:750;letter-spacing:.7px;color:#eee5ff}
+  button.equipment-toggle{width:auto;margin:0;padding:2px 7px;border:1px solid rgba(220,210,255,.19);
+    border-radius:6px;background:rgba(8,6,20,.25);box-shadow:none;font-size:10px;font-weight:500;
+    color:#eee5ff;letter-spacing:0;text-shadow:0 1px 3px #000}
+  .equipment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+  details.equipment-item{min-width:0;padding:0;border:1px solid rgba(220,210,255,.12);
+    border-radius:7px;background:rgba(8,6,20,.13);overflow:hidden}
+  .equipment-item[open]{background:rgba(8,6,20,.38);border-color:rgba(220,210,255,.25)}
+  .equipment-main{min-width:0;display:flex;align-items:center;gap:5px;padding:4px;list-style:none;cursor:pointer}
+  .equipment-main::-webkit-details-marker{display:none}
+  .equipment-main:hover{background:rgba(50,35,80,.18)}
+  .equipment-main:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+  .equipment-icon{width:33px;height:33px;flex:0 0 33px;border-radius:5px;display:flex;align-items:center;
+    justify-content:center;background:rgba(28,18,50,.37);border:1px solid rgba(245,196,0,.16);
+    font-size:19px;color:#ffdc39;overflow:hidden}
+  .equipment-icon img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+  .equipment-info{min-width:0;display:flex;flex-direction:column;gap:1px;flex:1}
+  .equipment-slot{font-size:8px;color:#d7d1f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .equipment-name{font-size:10px;font-weight:700;line-height:1.2;color:#fff;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .equipment-extra{font-size:8.5px;color:#ffe07e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .equipment-caret{font-size:10px;color:#c9bddf;transition:transform .12s}
+  details.equipment-item[open] .equipment-caret{transform:rotate(90deg)}
+  .equipment-stats{display:grid;gap:3px;padding:5px 7px 7px;border-top:1px solid rgba(220,210,255,.09)}
+  .equipment-stat{display:flex;justify-content:space-between;align-items:baseline;gap:6px;
+    font-size:9px;color:#e2deff;line-height:1.25}
+  .equipment-stat b{font-size:9px;color:#ffe07e;text-align:right;font-variant-numeric:tabular-nums}
+  .equipment-no-stats,.equipment-note{font-size:10px;color:var(--muted)}
+  .equipment-note{padding:4px 2px}
+  .api-setup{display:flex;flex-direction:column;gap:7px;padding:9px;border:1px solid var(--line);border-radius:12px;background:rgba(9,7,24,.35)}
+  .api-setup[hidden]{display:none}
+  .api-setup input[type=text]{width:100%;min-width:0;padding:6px 8px;background:rgba(8,6,20,.65);border:1px solid var(--line);color:var(--text);border-radius:8px;font:11px ui-monospace,Consolas,monospace}
+  .api-setup .api-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .api-setup .api-actions button{width:auto;margin:0;padding:7px 12px;font-size:11px}
+  .api-setup .api-status{font-size:11px;color:var(--muted);margin:0}
+  .api-setup code{overflow-wrap:anywhere;user-select:all;font-size:11px;color:var(--gold)}
+
+  /* O GIF ocupa uma área fixa: ocultar atributos NUNCA altera a altura do card. */
+  .hero{
+    height:228px;min-height:228px;max-height:228px;
+    align-items:stretch;
+  }
+  .hero::before{
+    background-position:center center;
+    background-size:cover;
+  }
+  .hero-main{display:flex;flex-direction:column;height:100%;min-height:0}
+  .hero-main .grid{align-content:start;flex:0 0 auto}
+  .hero .xp{margin-top:auto;padding-top:5px;flex:0 0 auto}
+  .hero-art{align-self:stretch;align-items:flex-end;width:92px}
+  .hero-art img{max-height:178px}
+
+  /* Um único botão discreto + painel flutuante, sem deslocar o restante do popup. */
+  .stat-tools{
+    position:relative;margin:6px 0 0 auto;width:max-content;max-width:100%;z-index:15;
+  }
+  .stat-tools > summary{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:4px 8px;border:1px solid rgba(224,212,255,.2);border-radius:999px;
+    background:rgba(16,13,34,.42);color:#f6f2ff;
+    box-shadow:none;backdrop-filter:blur(6px);
+    font-size:10.5px;font-weight:600;letter-spacing:0;
+    transition:border-color .15s,background-color .15s;
+  }
+  .stat-tools > summary::before{content:none}
+  .stat-tools > summary::after{
+    content:'⌄';font-size:12px;line-height:1;color:#c9bddf;transition:transform .15s;
+  }
+  .stat-tools[open] > summary::after{transform:rotate(180deg)}
+  .stat-tools > summary:hover,.stat-tools[open] > summary{
+    background:rgba(34,26,58,.77);border-color:rgba(245,196,0,.46)
+  }
+  .stat-tools > summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .stat-tools .stat-icon{font-size:12px;color:var(--gold);line-height:1}
+  .stat-tools .stat-badge{
+    display:inline-block;font-size:9px;color:#c9c3dd;font-variant-numeric:tabular-nums;
+    border-left:1px solid rgba(225,215,255,.16);padding-left:6px;
+  }
+  .stat-tools .stat-options{
+    position:absolute;top:calc(100% + 7px);right:0;z-index:20;
+    display:block;width:345px;max-width:calc(100vw - 28px);
+    padding:11px;background:rgba(17,13,37,.97);
+    border:1px solid rgba(203,186,255,.3);border-radius:12px;
+    box-shadow:0 12px 30px rgba(0,0,0,.58);backdrop-filter:blur(16px);
+  }
+  .stat-options-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+  .stat-options-title{font-size:11px;font-weight:750;color:#fff}
+  .stat-actions{display:flex;gap:5px}
+  button.stat-action{
+    width:auto;min-width:0;margin:0;padding:4px 8px;
+    border:1px solid rgba(220,210,255,.18);border-radius:999px;
+    background:rgba(220,210,255,.07);box-shadow:none;
+    color:#e4def6;font-size:9.5px;font-weight:600;letter-spacing:0;
+    text-shadow:none;
+  }
+  button.stat-action:hover{background:rgba(245,196,0,.17);filter:none}
+  .stat-options-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .stat-options label{
+    display:flex;align-items:center;gap:7px;min-height:27px;padding:5px 7px;
+    border:1px solid rgba(215,204,255,.08);border-radius:8px;
+    background:rgba(215,204,255,.04);font-size:10.5px;
+    color:#eeeaf9;transition:background .12s;
+  }
+  .stat-options label:hover{background:rgba(215,204,255,.12)}
+  .stat-options label:has(input:not(:checked)){opacity:.68}
+  .stat-options input{margin:0;accent-color:var(--gold)}
+
+  /* 0.8.8 - ajuste de cartões e confirmação explícita */
+  body, .glass, .cfg, .hero, .status, .top, .grid, .cell{max-width:100%;min-width:0}
+  .cfg-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cfg-row label.row{min-width:0;flex-wrap:wrap;overflow-wrap:anywhere}
+  .cfg-row label.row input[type=number]{width:68px;max-width:100%;flex:0 0 68px}
+  .cfg-row label.row select{max-width:100%;min-width:0}
+  ul#liveList{grid-template-columns:repeat(2,minmax(0,1fr));max-width:100%}
+  #liveList li{min-width:0;flex-wrap:wrap;gap:5px;padding:8px}
+  #liveList li .left{flex:1 1 90px;min-width:0}
+  #liveList li .val{font-size:10.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  #liveList li .name{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .hero-art{flex:0 0 92px!important;width:92px!important;min-width:92px}
+  .hero-art img{max-height:178px!important;width:auto;object-fit:contain}
+  .hero .grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .hero .cell{overflow:hidden}
+  .monitor-content .top{flex-wrap:wrap}
+  .monitor-content .meta{min-width:0;max-width:100%;flex:1 1 150px;white-space:normal}
+  .suggestion{padding:12px;margin-top:12px;border:1px solid rgba(245,196,0,.5);border-radius:14px}
+  .suggestion[hidden]{display:none!important}
+  .suggestion-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;align-items:center}
+  .suggestion-head strong{color:var(--gold);font-size:13px}
+  .suggestion-head span{color:var(--muted);font-size:11px}
+  .suggestion-detail{font-size:13px;margin:8px 0;overflow-wrap:anywhere}
+  .suggestion-actions{display:flex;gap:8px}
+  .suggestion-actions button{margin:0;padding:9px 8px;flex:1;min-width:0}
+  #dismissLive{background:rgba(158,145,195,.22);color:var(--text);border:1px solid var(--line);box-shadow:none}
+  .live-go{width:auto!important;margin:0!important;padding:4px 9px!important;border-radius:8px!important;font-size:10px!important;box-shadow:none!important;flex:0 0 auto}
+  /* 0.8.9 — modos de troca e favoritos autorizados */
+  .mode-panel{padding:11px 12px;margin:10px 0;display:flex;flex-direction:column;gap:7px;min-width:0}
+  .mode-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .mode-head label{font-size:12px;font-weight:800;color:var(--gold)}
+  #allowedCount{font-size:11px;color:var(--muted)}
+  #liveMode{width:100%;max-width:100%;border-radius:10px;padding:9px 10px;background:#211b39;font-size:12px;min-width:0}
+  .mode-hint{color:var(--muted);font-size:11px;line-height:1.5;margin:0;overflow-wrap:anywhere}
+  .allow-note{display:block;margin:6px 0;color:var(--muted);font-size:11px}
+  #liveList li{align-items:center;gap:5px;min-width:0;overflow:hidden}
+  .allowed-action{background:rgba(150,135,235,.18);color:var(--text);border:1px solid var(--line);border-radius:8px;
+    margin:0!important;padding:5px 8px!important;box-shadow:none!important;width:auto!important;flex:1 1 100%;font-size:10.5px;text-align:center}
+  .allowed-action.is-allowed{color:#0d291c;background:#50db91;border-color:#50db91}
+  #liveList li .left{flex:1 1 100px;max-width:100%}
+  #liveList li .name{white-space:nowrap}
+  @media(max-width:420px){ul#liveList{grid-template-columns:1fr}}
+  /* 0.9.0: configurações separadas e cartões consistentes */
+  .settings-group{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .settings-group h3{font-size:11px;letter-spacing:.4px;color:var(--gold);margin:0;font-weight:800}
+  .setting-help{font-size:11px;line-height:1.5;color:var(--muted)}
+  details.subsec{min-width:0;border-bottom:1px solid rgba(190,174,255,.12);padding-bottom:9px}
+  details.subsec:last-of-type{border-bottom:0}
+  details.subsec > summary{font-size:12px;letter-spacing:.15px;text-transform:none;color:#f0ebff;padding:8px 1px}
+  details.subsec[open] > summary{color:#ffdb55}
+  .cfg{min-width:0}
+  .mode-panel{margin:2px 0 4px;background:rgba(18,13,38,.72)}
+  .cfg-row{gap:10px 12px}
+  .cfg-row label.row{font-size:11.5px;line-height:1.35;align-items:center}
+  .cfg-row select{max-width:100%;width:auto}
+  ul#liveList{gap:7px}
+  #liveList li{padding:7px;min-width:0;display:flex;flex-flow:row wrap}
+  #liveList li .left{flex:1 1 100%;min-width:0}
+  #liveList li .val{flex:1 1 auto;min-width:0}
+  #liveList li .allowed-action{flex:1 1 100%;min-width:0}
+  #liveList li .live-go{flex:0 0 auto}
+  .hero-head{min-width:0}
+  .hero-head strong,.hero-head .in{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .hero .cell small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hero .cell b{width:100%;overflow:hidden;text-overflow:ellipsis}
+  /* 0.9.1 — leitura rápida, acessibilidade e forja com pausa controlada */
+  .quick-state{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .quick-pill{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:5px 9px;
+    border:1px solid rgba(181,168,235,.30);border-radius:999px;background:rgba(18,14,39,.75);
+    font-size:10.5px;font-weight:650;color:#eee9ff;line-height:1.35;white-space:normal}
+  .quick-pill.warn{border-color:rgba(245,196,0,.50);color:#ffe287}
+  .quick-pill.ok{border-color:rgba(52,213,122,.36);color:#95f1bd}
+  .preference-row{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;
+    border:1px solid rgba(155,141,240,.28);border-radius:12px;background:rgba(16,12,36,.64);min-width:0}
+  .preference-row input{flex:none;margin:3px 0 0;accent-color:var(--gold)}
+  .preference-row span{min-width:0;display:flex;flex-direction:column;gap:3px}
+  .preference-row strong{font-size:12px;color:#fff}
+  .preference-row small{font-size:11px;line-height:1.45}
+  .forge-info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:5px}
+  .forge-metric{padding:9px;border-radius:11px;background:rgba(15,12,31,.65);border:1px solid var(--line);min-width:0}
+  .forge-metric span{display:block;color:var(--muted);font-size:10px}
+  .forge-metric b{display:block;margin-top:2px;font-size:15px;font-variant-numeric:tabular-nums}
+  .forge-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+  .forge-controls button{width:auto;flex:1 1 140px;margin:0;padding:8px 10px;border-radius:10px;font-size:11px}
+  .forge-controls button.secondary{color:#eee9ff;background:rgba(115,101,172,.23);border:1px solid var(--line);box-shadow:none}
+  .forge-limit-bar{width:100%;height:7px;border-radius:20px;overflow:hidden;background:rgba(0,0,0,.48)}
+  .forge-limit-bar span{display:block;height:100%;background:linear-gradient(90deg,#c8a72d,#f5c400);width:0%;transition:width .2s}
+  .forge-state{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+  #forgeStatus{padding:10px 11px;border-radius:10px;background:rgba(13,11,29,.68);border-left:3px solid var(--line);overflow-wrap:anywhere}
+  #forgeStatus.is-paused{border-left-color:#f5c400;color:#ffe6a0}
+  #forgeStatus.is-error{border-left-color:#ff6b6b;color:#ffc5c5}
+  button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .cfg-row label.row{overflow-wrap:anywhere}
+  .hero-head{flex-wrap:wrap;align-items:center;gap:5px 9px}
+  .hero-head .in{margin-left:0;flex:1 1 100%;font-size:10.5px}
+  .mode-panel,.cfg,.glass{overflow-wrap:anywhere}
+  @media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+  .forge-section > .cfg{margin-top:5px}
+  /* 0.9.2 — leitura de jogadores e FC: informação acima da autorização */
+  .monitor-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:6px}
+  .monitor-number{display:flex;flex-direction:column;justify-content:space-between;gap:3px;padding:10px 12px;
+    border:1px solid rgba(146,131,213,.37);background:rgba(17,14,35,.69);border-radius:12px;min-width:0}
+  .monitor-number span{font-size:10.5px;color:#d6d0f2;line-height:1.35}
+  .monitor-number strong{display:block;font-size:24px;line-height:1.1;color:#74efaa;
+    font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .monitor-number + .monitor-number strong{color:#ffe077}
+  .monitor-footnote{display:block;text-align:right;font-size:10px;margin:0 0 7px;color:#c1badd}
+  .monitor-content .top{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,40%);gap:10px}
+  .monitor-content .status{min-width:0;overflow-wrap:anywhere}
+  .monitor-content .meta{min-width:0;max-width:none;align-items:flex-end;text-align:right}
+  #liveList{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px}
+  #liveList li{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;align-content:start;
+    min-width:0;min-height:125px;padding:9px 8px;overflow:hidden;border-radius:12px}
+  #liveList li .left{width:100%;max-width:100%;flex:none;min-width:0;gap:6px}
+  #liveList li .name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+  #liveList li .tag{font-size:9px;padding:1px 4px;margin-left:5px}
+  #liveList li .val{width:100%;padding:3px 8px;font-size:10.5px;text-align:left;border-radius:7px}
+  .live-stat-row{display:grid;grid-template-columns:minmax(0,.76fr) minmax(0,1.24fr);gap:4px;width:100%;min-width:0}
+  .live-stat{display:block;min-width:0;padding:5px 5px;border:1px solid rgba(155,145,229,.17);
+    border-radius:8px;background:rgba(10,8,22,.45);font-size:10px;font-weight:750;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;text-align:center}
+  .live-stat.people{color:#a6edce}.live-stat.power{color:#d5c1ff;font-size:9.3px;letter-spacing:-.2px}
+  .live-stat-row button.live-fc-retry{width:100%;margin:0;padding:5px;box-shadow:none;background:rgba(65,51,110,.24);
+    color:#decfff;border:1px dashed rgba(166,146,239,.48);font-size:9.3px;font-weight:750;border-radius:8px;
+    letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .live-stat-row button.live-fc-retry:hover{background:rgba(95,79,148,.34)}
+  .char-live-metrics{display:flex;flex-wrap:wrap;align-items:center;gap:4px 11px;margin:1px 0 5px;
+    padding:4px 7px;background:rgba(12,9,29,.36);border:1px solid rgba(165,140,245,.17);
+    border-radius:7px;font-size:10px;font-weight:750;text-shadow:0 1px 3px #000;
+    font-variant-numeric:tabular-nums}
+  .char-live-people{color:#a9f4cf}
+  .char-live-fc{color:#ffe27c;overflow-wrap:anywhere}
+  .live-actions{display:flex;gap:5px;width:100%;min-width:0;align-items:stretch}
+  #liveList li .allowed-action{flex:1 1 auto;min-width:0;width:100%;margin:0!important;padding:5px 6px!important;font-size:10.5px}
+  #liveList li .live-go{flex:0 0 auto;padding:5px 9px!important}
+  #liveList li.empty{min-height:0}
 </style></head><body>
-  <small>Links ou nomes das lives (um por linha):</small>
-  <textarea id="livesText" placeholder="https://www.twitch.tv/flavinnbr&#10;belky"></textarea>
-  <label>Reiniciou quando zona ≤ <input id="resetZone" type="number" min="1"></label>
-  <label>Intervalo mín. entre buscas (s) <input id="scanGapSec" type="number" min="30"></label>
-  <label class="chk"><input id="autoJogar" type="checkbox"> Digitar $jogar na live de maior zona</label>
-  <button id="toggle">Ligar</button>
-  <button id="scanNow" class="sec">Procurar agora</button>
-  <div id="status"></div>
-  <div id="summary"></div>
+  <header>
+    <img class="logo" src="icon.png" alt="">
+    <div class="title"><strong>JARVIS</strong><span id="subtitle">Desligado</span></div>
+    <label class="switch" title="Ligar ou desligar">
+      <input id="enabled" type="checkbox" aria-label="Ligar ou desligar">
+      <span class="track"></span>
+    </label>
+  </header>
+
+  <details class="sec" data-key="mine" open>
+    <summary>Seu personagem</summary>
+    <div id="mine"></div>
+  </details>
+
+
+  <section id="suggestionBox" class="suggestion glass" hidden>
+    <div class="suggestion-head"><strong>Live recomendada</strong><span>Você decide quando entrar</span></div>
+    <div id="suggestionText" class="suggestion-detail"></div>
+    <div class="suggestion-actions"><button id="approveLive" type="button">Ir para esta live</button><button id="dismissLive" type="button">Agora não</button></div>
+  </section>
+  <button id="scanNow">Procurar agora</button>
+  <div class="quick-state" id="quickState" role="status" aria-label="Resumo de operação"></div>
+
+  <details class="sec" data-key="cfg">
+    <summary>Configurações</summary>
+    <div class="cfg glass">
+      <details class="sec subsec" data-key="monitor">
+        <summary>Monitoramento</summary>
+        <div class="monitor-content">
+          <div class="monitor-numbers" aria-label="Quantidade de pessoas jogando">
+            <div class="monitor-number"><span>Jogando <span id="monitorLiveName">na live atual</span></span><strong id="monitorLivePlayers">—</strong></div>
+            <div class="monitor-number"><span>Total nas lives monitoradas</span><strong id="monitorAllPlayers">—</strong></div>
+          </div>
+          <small class="monitor-footnote" id="monitorLivesMeasured">0/0 lives com dados</small>
+          <div class="top">
+            <div id="statusBox" class="status glass"><p id="status"></p></div>
+            <div class="meta" aria-label="Informações e contadores da automação">
+              <span id="me"></span><span id="next"></span><span id="next2"></span><span id="next3"></span>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details class="sec subsec" data-key="appearance">
+        <summary>Aparência</summary>
+        <div class="cfg-appearance">
+          <label class="row">Visibilidade do fundo <input id="bgVis" type="range" min="0" max="100"></label>
+        </div>
+      </details>
+
+      <details class="sec subsec" data-key="lives" open>
+        <summary>Lives <span class="count" id="livesCount"></span></summary>
+        <div class="settings-group"><h3>Escolha e troca de lives</h3>
+          <section class="mode-panel glass" aria-label="Modo de escolha das lives">
+    <div class="mode-head"><label for="liveMode">Como a Jarvis escolhe a live?</label><span id="allowedCount">0 permitidas</span></div>
+    <select id="liveMode" aria-describedby="liveModeHint">
+      <option value="manual">Manual — eu confirmo cada entrada</option>
+      <option value="allowed">Só lives permitidas — troca sozinha</option>
+      <option value="automatic">Automático — melhores lives disponíveis</option>
+    </select>
+    <p id="liveModeHint" class="mode-hint"></p>
+          </section>
+          <small class="setting-help">Este ajuste controla se a Jarvis precisa da sua confirmação ou pode trocar sozinha.</small>
+          <label class="preference-row" for="muteLives">
+            <input id="muteLives" type="checkbox" checked>
+            <span><strong>🔇 Abrir lives sem som</strong><small>A Jarvis silencia a aba antes de carregar a Twitch, inclusive ao trocar de canal. Você pode ativar o áudio manualmente no Chrome.</small></span>
+          </label>
+        </div>
+        <small class="allow-note">Marque <strong>✓ Permitida</strong> nas lives que a Jarvis pode visitar sozinha no modo “Só lives permitidas”. O botão de seleção geral da lista continua controlando quais canais são monitorados.</small>
+        <ul id="liveList" class="glass"></ul>
+        <div class="cfg cfg-sub">
+          <div class="settings-group"><h3>Descoberta de canais</h3></div>
+          <div class="discover-tools">
+            <button id="discoverNow" type="button" class="mini-btn">Descobrir top lives online (API)</button>
+            <label class="row"><input id="discoverEnabled" type="checkbox"> Atualizar automaticamente</label>
+            <label class="row">a cada (min) <input id="discoverMin" title="Intervalo da leitura automática do ranking de lives online. Mínimo 2 min." type="number" min="2" step="1"></label>
+            <label class="row">Top <input id="discoverTop" title="Quantas lives do topo do ranking (só online, mais jogadores simultâneos) entram na lista. 1 a 50." type="number" min="1" max="50" step="1"></label>
+          </div>
+          <small id="discoverStatus" class="discover-note"></small>
+          <small>Links ou nomes das lives (um por linha):</small>
+          <textarea id="livesText" placeholder="https://www.twitch.tv/flavinnbr&#10;belky"></textarea>
+          <div class="settings-group"><h3>Regras de busca e zona</h3><small class="setting-help">A zona do seu personagem é lida continuamente; a busca de canais pode ser feita a cada 2 minutos.</small></div>
+          <div class="cfg-row">
+            <label class="row">Reiniciou quando zona ≤ <input id="resetZone" type="number" min="1"></label>
+            <label class="row">Intervalo mín. entre buscas (s) <input id="scanGapSec" type="number" min="30"></label>
+            <label class="row">Zona parada há (min) <input id="stallMin" title="0 = desliga" type="number" min="0"></label>
+            <label class="row">Busca automática (min) <input id="autoScanMin" title="Faz automaticamente a mesma consulta do botão Procurar agora. 0 = desliga; mínimo 2 min." type="number" min="0" step="1"></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="sec subsec" data-key="chat">
+        <summary>Entrada no chat e envio do $jogar</summary>
+        <div class="cfg cfg-sub">
+          <div class="settings-group"><h3>Como entrar na live</h3>
+            <small class="setting-help">Configure o comando, o método de envio e as permissões da Twitch separadamente da busca de lives. Para evitar mensagens duplicadas, o reenvio automático na mesma live permanece desativado.</small>
+          </div>
+          <div class="cfg-row">
+            <label class="row"><input id="autoJogar" type="checkbox"> Enviar $jogar após eu autorizar a live</label>
+            <label class="row">Método de envio
+              <select id="sendMethod" title="Chat mantém o envio atual; API envia sem abrir a live, após autorizar a Twitch.">
+                <option value="chat">Chat (atual)</option>
+                <option value="api">API da Twitch (sem aba)</option>
+              </select>
+            </label>
+            <label class="row"><input id="autoFollow" type="checkbox"> Seguir automaticamente a live antes do $jogar</label>
+            <label class="row">Aguardar após seguir (s) <input id="followWaitSec" title="Tempo entre seguir e enviar $jogar. Se o chat exigir mais tempo como seguidor, a Twitch continua bloqueando o envio." type="number" min="0" max="180" step="1"></label>
+          </div>
+          <div id="apiSetup" class="api-setup" hidden>
+            <strong>Conectar Twitch — modo API</strong>
+            <small>Cadastre um aplicativo em <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener noreferrer">Twitch Developers</a> e informe o Client ID (não o Client Secret). Adicione o endereço abaixo como OAuth Redirect URL do aplicativo.</small>
+            <label>URL de retorno OAuth (copie exatamente): <code id="twitchRedirect"></code></label>
+            <label>Client ID Twitch <input id="twitchClientId" type="text" autocomplete="off" spellcheck="false" placeholder="Client ID do seu aplicativo"></label>
+            <div class="api-actions">
+              <button id="twitchConnect" type="button">Conectar Twitch</button>
+              <button id="twitchDisconnect" type="button">Desconectar</button>
+            </div>
+            <p id="twitchStatus" class="api-status" role="status">Verificando conexão...</p>
+            <small>Autorize apenas user:write:chat. A sessão é temporária e pode precisar de nova autorização após reiniciar o navegador. No modo API, o follow automático não é executado, pois ele depende do botão da página. Restrições do chat continuam valendo.</small>
+          </div>
+          <small>Follow automático: identifica o botão da live, usa clique real do navegador e só envia $jogar após confirmação visual do follow e espera configurada (0 a 180 s). Se não confirmar, não envia o comando. Não ignora restrições da Twitch. Disponível somente com o método Chat.</small>
+        </div>
+      </details>
+
+
+    </div>
+  </details>
+
+  <!-- Forja em seção independente imediatamente abaixo de Configurações. -->
+      <details class="sec forge-section" data-key="forge">
+        <summary>⚒ Forja <span class="count" id="forgeCount"></span></summary>
+        <div class="cfg glass cfg-sub">
+          <div class="cfg-row">
+            <label class="row"><input id="forgeEnabled" type="checkbox"> Ativar</label>
+            <label class="row">Forjar até
+              <select id="forgeMax">
+                <option value="raro">Raro</option><option value="epico">Épico</option><option value="lendario">Lendário</option>
+                <option value="imortal">Imortal</option><option value="arcano">Arcano</option>
+              </select></label>
+            <label class="row">Chance mín. (%) <input id="forgeMinChance" title="100 = nunca aposta" type="number" min="1" max="100"></label>
+            <label class="row"><input id="forgeDry" type="checkbox"> Modo teste (só lê, não forja)</label>
+            <label class="row">Limite de tentativas <input id="forgePauseAfter" type="number" min="0" max="10000" step="1" title="0 = sem limite. Conta tanto sucessos quanto falhas desta sessão."></label>
+          </div>
+          <small class="setting-help">Limite opcional de tentativas por sessão (0 = ilimitado). Uma tentativa concluída conta mesmo se falhar. Não cancela uma forja que já foi confirmada.</small>
+          <div class="forge-info" aria-label="Contadores de forja">
+            <div class="forge-metric"><span>Concluídas</span><b id="forgeSuccessCount">0</b></div>
+            <div class="forge-metric"><span>Falhas</span><b id="forgeFailCount">0</b></div>
+            <div class="forge-metric"><span>Nesta sessão</span><b id="forgeSessionCount">0</b></div>
+          </div>
+          <div class="forge-controls">
+            <button type="button" id="forgePauseButton" class="secondary">⏸ Pausar</button>
+            <button type="button" id="forgeResetCount" class="secondary" title="Zera só os contadores; não altera os itens.">Zerar contadores</button>
+          </div>
+          <div class="forge-limit-bar" id="forgeLimitBar" hidden><span id="forgeLimitFill"></span></div>
+          <p id="forgeLimitText" class="forge-state"></p>
+          <p id="forgeStatus" class="note" role="status"></p>
+          <small>Abra a aba Forja do inventário. Chance mínima 100 = nunca aposta. Cada tentativa tem limite de 15 segundos. Se o resultado for incerto, a Jarvis interrompe a forja por segurança.</small>
+        </div>
+      </details>
+
   <script src="popup.js"></script>
 </body></html>
